@@ -8,5 +8,7 @@
   <include file="db/changelog/changes/V1-initial-schema.xml"/>
   <include file="db/changelog/changes/V2-seed-data.xml"/>
   <include file="db/changelog/changes/V3-add-audit-columns.xml"/>
+  <include file="db/changelog/changes/V3-invite-tokens.xml"/>
+  <include file="db/changelog/changes/V4-fix-seed-passwords.xml"/>
 
 </databaseChangeLog>

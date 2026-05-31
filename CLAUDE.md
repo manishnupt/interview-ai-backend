@@ -45,7 +45,7 @@ com.aiinterview.backend
 - ALWAYS return responses wrapped in ApiResponse<T>
 - ALWAYS validate request bodies with @Valid
 - NEVER put business logic in controllers — only in services
-- ALL database changes go through Flyway migration scripts
+- ALL database changes go through Liquibase migration scripts
 - ALWAYS use ResponseEntity in controllers
 
 ## Key ports
@@ -57,3 +57,19 @@ com.aiinterview.backend
 ## Environment
 All config in application.yml — never hardcode values.
 Local dev uses application-local.yml for overrides.
+
+## Auth system (Sprint 10)
+- JWT stored in HttpOnly cookie OR Authorization header (support both)
+- Token payload: { userId, companyId, role, email }
+- Token expiry: 24 hours (configurable via app.jwt.expiration-ms)
+- Password hashing: BCrypt strength 10
+- Role hierarchy: SUPER_ADMIN > COMPANY_ADMIN > HR_MEMBER
+- All protected routes extract companyId from JWT — never from request body
+- Invite flow: generate signed token → email link → recipient sets password
+
+## Security rules
+- /api/auth/** → public
+- /api/public/** → public (candidate apply form)
+- /api/admin/** → SUPER_ADMIN only
+- /api/** → authenticated (any role)
+- CORS: allow http://localhost:5173 in dev
