@@ -1,0 +1,37 @@
+spring:
+  application:
+    name: ai-interview-backend
+  datasource:
+    url: jdbc:postgresql://localhost:5434/ai_interview_db
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:admin}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
+    enabled: true
+
+server:
+  port: 4040
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:localdevsecretkey1234567890abcdef}
+    expiration-ms: 86400000
+  python-ai-service:
+    url: ${PYTHON_AI_URL:http://localhost:8000}
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
+  aws:
+    bucket: ${AWS_S3_BUCKET:ai-interview-resumes}
+    region: ${AWS_REGION:ap-south-1}
+  sendgrid:
+    api-key: ${SENDGRID_API_KEY:}
+    from-email: noreply@aiinterview.com
+    from-name: AI Interview Platform

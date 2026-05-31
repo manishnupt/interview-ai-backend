@@ -1,0 +1,26 @@
+package com.aiinterview.backend.company;
+
+import com.aiinterview.backend.common.BaseEntity;
+import jakarta.persistence.*;
+import lombok.*;
+
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Entity
+@Table(name = "companies")
+public class Company extends BaseEntity {
+
+    @Column(nullable = false)
+    private String name;
+
+    @Column(nullable = false, unique = true, length = 100)
+    private String slug;
+
+    @Column(nullable = false, length = 50)
+    private String plan;
+
+    @Column(name = "is_active", nullable = false)
+    private boolean isActive;
+}

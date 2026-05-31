@@ -1,0 +1,307 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+  <!-- companies -->
+  <changeSet id="1-create-companies" author="system">
+    <createTable tableName="companies">
+      <column name="id" type="BIGSERIAL">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="name" type="VARCHAR(255)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="slug" type="VARCHAR(100)">
+        <constraints nullable="false" unique="true"/>
+      </column>
+      <column name="plan" type="VARCHAR(50)" defaultValue="trial">
+        <constraints nullable="false"/>
+      </column>
+      <column name="is_active" type="BOOLEAN" defaultValueBoolean="true">
+        <constraints nullable="false"/>
+      </column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="NOW()">
+        <constraints nullable="false"/>
+      </column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="NOW()">
+        <constraints nullable="false"/>
+      </column>
+    </createTable>
+  </changeSet>
+
+  <!-- users -->
+  <changeSet id="2-create-users" author="system">
+    <createTable tableName="users">
+      <column name="id" type="BIGSERIAL">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="company_id" type="BIGINT">
+        <constraints nullable="false"
+          foreignKeyName="fk_users_company"
+          references="companies(id)"/>
+      </column>
+      <column name="name" type="VARCHAR(255)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="email" type="VARCHAR(255)">
+        <constraints nullable="false" unique="true"/>
+      </column>
+      <column name="password_hash" type="VARCHAR(255)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="role" type="VARCHAR(50)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="is_active" type="BOOLEAN" defaultValueBoolean="true">
+        <constraints nullable="false"/>
+      </column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="NOW()">
+        <constraints nullable="false"/>
+      </column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="NOW()">
+        <constraints nullable="false"/>
+      </column>
+    </createTable>
+    <createIndex tableName="users" indexName="idx_users_company">
+      <column name="company_id"/>
+    </createIndex>
+    <createIndex tableName="users" indexName="idx_users_email">
+      <column name="email"/>
+    </createIndex>
+  </changeSet>
+
+  <!-- jobs -->
+  <changeSet id="3-create-jobs" author="system">
+    <createTable tableName="jobs">
+      <column name="id" type="BIGSERIAL">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="company_id" type="BIGINT">
+        <constraints nullable="false"
+          foreignKeyName="fk_jobs_company"
+          references="companies(id)"/>
+      </column>
+      <column name="title" type="VARCHAR(255)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="description" type="TEXT">
+        <constraints nullable="false"/>
+      </column>
+      <column name="required_experience_years" type="INT" defaultValueNumeric="0">
+        <constraints nullable="false"/>
+      </column>
+      <column name="required_skills" type="TEXT"/>
+      <column name="screening_threshold" type="INT" defaultValueNumeric="6">
+        <constraints nullable="false"/>
+      </column>
+      <column name="status" type="VARCHAR(50)" defaultValue="draft">
+        <constraints nullable="false"/>
+      </column>
+      <column name="slug" type="VARCHAR(255)">
+        <constraints nullable="false" unique="true"/>
+      </column>
+      <column name="openings_count" type="INT" defaultValueNumeric="1">
+        <constraints nullable="false"/>
+      </column>
+      <column name="created_by" type="BIGINT">
+        <constraints foreignKeyName="fk_jobs_created_by"
+          references="users(id)"/>
+      </column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="NOW()">
+        <constraints nullable="false"/>
+      </column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="NOW()">
+        <constraints nullable="false"/>
+      </column>
+    </createTable>
+    <createIndex tableName="jobs" indexName="idx_jobs_company">
+      <column name="company_id"/>
+    </createIndex>
+    <createIndex tableName="jobs" indexName="idx_jobs_slug">
+      <column name="slug"/>
+    </createIndex>
+  </changeSet>
+
+  <!-- candidates -->
+  <changeSet id="4-create-candidates" author="system">
+    <createTable tableName="candidates">
+      <column name="id" type="BIGSERIAL">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="company_id" type="BIGINT">
+        <constraints nullable="false"
+          foreignKeyName="fk_candidates_company"
+          references="companies(id)"/>
+      </column>
+      <column name="job_id" type="BIGINT">
+        <constraints nullable="false"
+          foreignKeyName="fk_candidates_job"
+          references="jobs(id)"/>
+      </column>
+      <column name="name" type="VARCHAR(255)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="email" type="VARCHAR(255)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="phone" type="VARCHAR(50)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="resume_url" type="TEXT"/>
+      <column name="resume_s3_key" type="TEXT"/>
+      <column name="status" type="VARCHAR(50)" defaultValue="applied">
+        <constraints nullable="false"/>
+      </column>
+      <column name="applied_at" type="TIMESTAMP" defaultValueComputed="NOW()">
+        <constraints nullable="false"/>
+      </column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="NOW()">
+        <constraints nullable="false"/>
+      </column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="NOW()">
+        <constraints nullable="false"/>
+      </column>
+    </createTable>
+    <createIndex tableName="candidates" indexName="idx_candidates_company">
+      <column name="company_id"/>
+    </createIndex>
+    <createIndex tableName="candidates" indexName="idx_candidates_job">
+      <column name="job_id"/>
+    </createIndex>
+    <createIndex tableName="candidates" indexName="idx_candidates_status">
+      <column name="status"/>
+    </createIndex>
+    <createIndex tableName="candidates" indexName="idx_candidates_email">
+      <column name="email"/>
+    </createIndex>
+  </changeSet>
+
+  <!-- screening_results -->
+  <changeSet id="5-create-screening-results" author="system">
+    <createTable tableName="screening_results">
+      <column name="id" type="BIGSERIAL">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="candidate_id" type="BIGINT">
+        <constraints nullable="false" unique="true"
+          foreignKeyName="fk_screening_candidate"
+          references="candidates(id)"/>
+      </column>
+      <column name="company_id" type="BIGINT">
+        <constraints nullable="false"
+          foreignKeyName="fk_screening_company"
+          references="companies(id)"/>
+      </column>
+      <column name="score" type="INT"><constraints nullable="false"/></column>
+      <column name="match_percentage" type="INT"><constraints nullable="false"/></column>
+      <column name="fit" type="BOOLEAN"><constraints nullable="false"/></column>
+      <column name="fit_reasons" type="TEXT"/>
+      <column name="concerns" type="TEXT"/>
+      <column name="missing_skills" type="TEXT"/>
+      <column name="raw_json" type="TEXT"/>
+      <column name="screened_at" type="TIMESTAMP" defaultValueComputed="NOW()">
+        <constraints nullable="false"/>
+      </column>
+    </createTable>
+    <createIndex tableName="screening_results" indexName="idx_screening_company">
+      <column name="company_id"/>
+    </createIndex>
+  </changeSet>
+
+  <!-- interview_reports -->
+  <changeSet id="6-create-interview-reports" author="system">
+    <createTable tableName="interview_reports">
+      <column name="id" type="BIGSERIAL">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="candidate_id" type="BIGINT">
+        <constraints nullable="false" unique="true"
+          foreignKeyName="fk_interview_candidate"
+          references="candidates(id)"/>
+      </column>
+      <column name="company_id" type="BIGINT">
+        <constraints nullable="false"
+          foreignKeyName="fk_interview_company"
+          references="companies(id)"/>
+      </column>
+      <column name="score" type="INT"><constraints nullable="false"/></column>
+      <column name="strengths" type="TEXT"/>
+      <column name="weaknesses" type="TEXT"/>
+      <column name="recommendation" type="VARCHAR(50)"/>
+      <column name="summary" type="TEXT"/>
+      <column name="full_transcript" type="TEXT"/>
+      <column name="raw_json" type="TEXT"/>
+      <column name="interviewed_at" type="TIMESTAMP" defaultValueComputed="NOW()">
+        <constraints nullable="false"/>
+      </column>
+    </createTable>
+    <createIndex tableName="interview_reports" indexName="idx_interview_company">
+      <column name="company_id"/>
+    </createIndex>
+  </changeSet>
+
+  <!-- magic_links -->
+  <changeSet id="7-create-magic-links" author="system">
+    <createTable tableName="magic_links">
+      <column name="id" type="BIGSERIAL">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="token" type="VARCHAR(255)">
+        <constraints nullable="false" unique="true"/>
+      </column>
+      <column name="candidate_id" type="BIGINT">
+        <constraints nullable="false"
+          foreignKeyName="fk_magic_candidate"
+          references="candidates(id)"/>
+      </column>
+      <column name="expires_at" type="TIMESTAMP">
+        <constraints nullable="false"/>
+      </column>
+      <column name="used" type="BOOLEAN" defaultValueBoolean="false">
+        <constraints nullable="false"/>
+      </column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="NOW()">
+        <constraints nullable="false"/>
+      </column>
+    </createTable>
+    <createIndex tableName="magic_links" indexName="idx_magic_token">
+      <column name="token"/>
+    </createIndex>
+  </changeSet>
+
+  <!-- hr_notes -->
+  <changeSet id="8-create-hr-notes" author="system">
+    <createTable tableName="hr_notes">
+      <column name="id" type="BIGSERIAL">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="candidate_id" type="BIGINT">
+        <constraints nullable="false"
+          foreignKeyName="fk_notes_candidate"
+          references="candidates(id)"/>
+      </column>
+      <column name="company_id" type="BIGINT">
+        <constraints nullable="false"
+          foreignKeyName="fk_notes_company"
+          references="companies(id)"/>
+      </column>
+      <column name="author_id" type="BIGINT">
+        <constraints foreignKeyName="fk_notes_author"
+          references="users(id)"/>
+      </column>
+      <column name="content" type="TEXT">
+        <constraints nullable="false"/>
+      </column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="NOW()">
+        <constraints nullable="false"/>
+      </column>
+    </createTable>
+    <createIndex tableName="hr_notes" indexName="idx_notes_candidate">
+      <column name="candidate_id"/>
+    </createIndex>
+  </changeSet>
+
+</databaseChangeLog>
