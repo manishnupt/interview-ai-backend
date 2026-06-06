@@ -1,6 +1,11 @@
 spring:
   application:
     name: ai-interview-backend
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 5MB
+      max-request-size: 10MB
   datasource:
     url: jdbc:postgresql://localhost:5434/ai_interview_db
     username: ${DB_USERNAME:postgres}
@@ -26,7 +31,7 @@ app:
     secret: ${JWT_SECRET:localdevsecretkey1234567890abcdef}
     expiration-ms: 86400000
   python-ai-service:
-    url: ${PYTHON_AI_URL:http://localhost:8000}
+    url: ${PYTHON_AI_URL:http://localhost:8001}
   frontend-url: ${FRONTEND_URL:http://localhost:5173}
   aws:
     bucket: ${AWS_S3_BUCKET:ai-interview-resumes}

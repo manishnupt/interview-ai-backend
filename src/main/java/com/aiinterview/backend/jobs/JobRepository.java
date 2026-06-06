@@ -11,5 +11,7 @@ public interface JobRepository extends JpaRepository<Job, Long> {
 
     Optional<Job> findBySlug(String slug);
 
+    Optional<Job> findBySlugAndStatus(String slug, JobStatus status);
+
     Optional<Job> findByIdAndCompanyId(Long id, Long companyId);
 }

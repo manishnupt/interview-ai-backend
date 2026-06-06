@@ -11,9 +11,15 @@ public interface CandidateRepository extends JpaRepository<Candidate, Long> {
 
     List<Candidate> findAllByJobId(Long jobId);
 
+    List<Candidate> findAllByJobIdAndCompanyId(Long jobId, Long companyId);
+
     List<Candidate> findAllByStatus(CandidateStatus status);
 
     List<Candidate> findAllByStatusAndCompanyId(CandidateStatus status, Long companyId);
 
+    List<Candidate> findAllByCompanyIdAndStatus(Long companyId, CandidateStatus status);
+
     Optional<Candidate> findByIdAndCompanyId(Long id, Long companyId);
+
+    boolean existsByEmailAndJobId(String email, Long jobId);
 }
