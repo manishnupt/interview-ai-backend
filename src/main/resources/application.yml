@@ -34,8 +34,10 @@ app:
     url: ${PYTHON_AI_URL:http://localhost:8001}
   frontend-url: ${FRONTEND_URL:http://localhost:5173}
   aws:
-    bucket: ${AWS_S3_BUCKET:ai-interview-resumes}
+    bucket: ${AWS_S3_BUCKET:ai-interview-resumes-prod}
     region: ${AWS_REGION:ap-south-1}
+    access-key: ${AWS_ACCESS_KEY_ID:AKIA46XDEX55FSSDHMVP}
+    secret-key: ${AWS_SECRET_ACCESS_KEY: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}
   sendgrid:
     api-key: ${SENDGRID_API_KEY:}
     from-email: noreply@aiinterview.com

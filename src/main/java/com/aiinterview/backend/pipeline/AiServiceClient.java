@@ -1,6 +1,7 @@
 package com.aiinterview.backend.pipeline;
 
 import com.aiinterview.backend.common.BusinessException;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
@@ -30,40 +31,40 @@ public class AiServiceClient {
 
     @Data @NoArgsConstructor @AllArgsConstructor
     public static class ScreenRequest {
-        private Long candidateId;
-        private String resumeUrl;
-        private String jobDescription;
-        private Long jobId;
-        private Long companyId;
+        @JsonProperty("candidate_id")   private Long candidateId;
+        @JsonProperty("resume_url")     private String resumeUrl;
+        @JsonProperty("job_description") private String jobDescription;
+        @JsonProperty("job_id")         private Long jobId;
+        @JsonProperty("company_id")     private Long companyId;
     }
 
     @Data @NoArgsConstructor
     public static class ScreenResponse {
-        private Long candidateId;
-        private Boolean fit;
-        private Integer score;
-        private Integer matchPercentage;
-        private List<String> fitReasons;
-        private List<String> concerns;
-        private List<String> missingSkills;
+        @JsonProperty("candidate_id")     private Long candidateId;
+                                          private Boolean fit;
+                                          private Integer score;
+        @JsonProperty("match_percentage") private Integer matchPercentage;
+        @JsonProperty("fit_reasons")      private List<String> fitReasons;
+                                          private List<String> concerns;
+        @JsonProperty("missing_skills")   private List<String> missingSkills;
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor
     public static class InterviewRequest {
-        private Long candidateId;
-        private String phone;
-        private String candidateName;
-        private String resumeUrl;
-        private String jobDescription;
-        private Long jobId;
-        private Long companyId;
+        @JsonProperty("candidate_id")    private Long candidateId;
+                                         private String phone;
+        @JsonProperty("candidate_name")  private String candidateName;
+        @JsonProperty("resume_url")      private String resumeUrl;
+        @JsonProperty("job_description") private String jobDescription;
+        @JsonProperty("job_id")          private Long jobId;
+        @JsonProperty("company_id")      private Long companyId;
     }
 
     @Data @NoArgsConstructor
     public static class InterviewTriggerResponse {
-        private Long candidateId;
-        private String callSid;
-        private String status;
+        @JsonProperty("candidate_id") private Long candidateId;
+        @JsonProperty("call_sid")     private String callSid;
+                                      private String status;
     }
 
     // ── API calls ──

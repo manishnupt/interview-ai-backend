@@ -22,4 +22,6 @@ public interface CandidateRepository extends JpaRepository<Candidate, Long> {
     Optional<Candidate> findByIdAndCompanyId(Long id, Long companyId);
 
     boolean existsByEmailAndJobId(String email, Long jobId);
+
+    Optional<Candidate> findTopByEmailOrderByAppliedAtDesc(String email);
 }
