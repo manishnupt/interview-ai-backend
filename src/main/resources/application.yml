@@ -39,6 +39,6 @@ app:
     access-key: ${AWS_ACCESS_KEY_ID:xxxx}
     secret-key: ${AWS_SECRET_ACCESS_KEY:xxxx}
   sendgrid:
-    api-key: ${SENDGRID_API_KEY:}
+    api-key: ${SENDGRID_API_KEY:xxxx}
     from-email: noreply@aiinterview.com
     from-name: AI Interview Platform
