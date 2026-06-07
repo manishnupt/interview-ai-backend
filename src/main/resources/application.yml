@@ -7,9 +7,9 @@ spring:
       max-file-size: 5MB
       max-request-size: 10MB
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5434/ai_interview_db}
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:admin}
+    url: jdbc:postgresql://${PGHOST:localhost}:${PGPORT:5434}/${PGDATABASE:ai_interview_db}
+    username: ${PGUSER:postgres}
+    password: ${PGPASSWORD:admin}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
