@@ -28,15 +28,17 @@ server:
 
 app:
   jwt:
-    secret: ${JWT_SECRET:xxxx}
+    secret: ${JWT_SECRET:ai-interview-platform-dev-secret-key-minimum-256-bits-long}
     expiration-ms: 86400000
+    access-token-expiration-ms: 900000
+    refresh-token-expiration-days: 7
   python-ai-service:
     url: ${PYTHON_AI_URL:http://localhost:8001}
   frontend-url: ${FRONTEND_URL:http://localhost:5173}
   aws:
     bucket: ${AWS_S3_BUCKET:ai-interview-resumes-prod}
     region: ${AWS_REGION:ap-south-1}
-    access-key: ${AWS_ACCESS_KEY_ID:xxxx}
+    access-key: ${AWS_ACCESS_KEY_ID:AKIA46XDEX55FSSDHMVP}
     secret-key: ${AWS_SECRET_ACCESS_KEY:xxxx}
   sendgrid:
     api-key: ${SENDGRID_API_KEY:xxxx}

@@ -11,5 +11,6 @@
   <include file="db/changelog/changes/V3-invite-tokens.xml"/>
   <include file="db/changelog/changes/V4-fix-seed-passwords.xml"/>
   <include file="db/changelog/changes/V4-candidates-constraints.xml"/>
+  <include file="db/changelog/changes/V5-refresh-tokens.xml"/>
 
 </databaseChangeLog>

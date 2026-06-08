@@ -1,6 +1,8 @@
 package com.aiinterview.backend.auth;
 
 import com.aiinterview.backend.auth.dto.*;
+import com.aiinterview.backend.common.BusinessException;
+import com.aiinterview.backend.common.ResourceNotFoundException;
 import com.aiinterview.backend.company.Company;
 import com.aiinterview.backend.company.CompanyRepository;
 import com.aiinterview.backend.notifications.EmailService;
@@ -13,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -22,6 +25,8 @@ public class AuthService {
     private final UserRepository userRepository;
     private final CompanyRepository companyRepository;
     private final InviteTokenRepository inviteTokenRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final RefreshTokenService refreshTokenService;
     private final JwtUtil jwtUtil;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
@@ -30,7 +35,7 @@ public class AuthService {
     private String frontendUrl;
 
     @Transactional
-    public AuthResponse registerCompany(RegisterCompanyRequest req) {
+    public Map<String, Object> registerCompany(RegisterCompanyRequest req) {
         if (userRepository.existsByEmail(req.getAdminEmail())) {
             throw new IllegalStateException("Email already in use: " + req.getAdminEmail());
         }
@@ -53,11 +58,10 @@ public class AuthService {
         user.setActive(true);
         user = userRepository.save(user);
 
-        String token = jwtUtil.generateToken(user);
-        return buildAuthResponse(user, company, token);
+        return buildTokenResponse(user, company);
     }
 
-    public AuthResponse login(LoginRequest req) {
+    public Map<String, Object> login(LoginRequest req) {
         User user = userRepository.findByEmail(req.getEmail())
                 .orElseThrow(() -> new EntityNotFoundException("No account found for: " + req.getEmail()));
 
@@ -72,8 +76,7 @@ public class AuthService {
         Company company = companyRepository.findById(user.getCompanyId())
                 .orElseThrow(() -> new EntityNotFoundException("Company not found"));
 
-        String token = jwtUtil.generateToken(user);
-        return buildAuthResponse(user, company, token);
+        return buildTokenResponse(user, company);
     }
 
     @Transactional
@@ -101,7 +104,7 @@ public class AuthService {
     }
 
     @Transactional
-    public AuthResponse acceptInvite(AcceptInviteRequest req) {
+    public Map<String, Object> acceptInvite(AcceptInviteRequest req) {
         InviteToken invite = inviteTokenRepository.findByToken(req.getToken())
                 .orElseThrow(() -> new EntityNotFoundException("Invalid invite token"));
 
@@ -130,8 +133,49 @@ public class AuthService {
         Company company = companyRepository.findById(user.getCompanyId())
                 .orElseThrow(() -> new EntityNotFoundException("Company not found"));
 
-        String token = jwtUtil.generateToken(user);
-        return buildAuthResponse(user, company, token);
+        return buildTokenResponse(user, company);
+    }
+
+    public Map<String, Object> refresh(String rawRefreshToken) {
+        RefreshToken storedToken = refreshTokenService.validateRefreshToken(rawRefreshToken);
+
+        User user = userRepository.findById(storedToken.getUserId())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (!user.isActive()) {
+            throw new BusinessException("Account deactivated", 401);
+        }
+
+        // Rotate: revoke old, issue new
+        refreshTokenService.revokeRefreshToken(rawRefreshToken);
+        RefreshToken newRefreshToken = refreshTokenService.createRefreshToken(
+                user.getId(), user.getCompanyId());
+        String rawNewToken = newRefreshToken.getTokenHash();
+
+        String newAccessToken = jwtUtil.generateAccessToken(user);
+
+        Company company = companyRepository.findById(user.getCompanyId()).orElseThrow();
+
+        AuthResponse authResponse = AuthResponse.builder()
+                .accessToken(newAccessToken)
+                .email(user.getEmail())
+                .name(user.getName())
+                .role(user.getRole().name())
+                .companyId(user.getCompanyId())
+                .companyName(company.getName())
+                .build();
+
+        String cookie = refreshTokenService.buildRefreshCookie(
+                rawNewToken, jwtUtil.getRefreshTokenExpirationDays());
+
+        return Map.of("authResponse", authResponse, "cookie", cookie);
+    }
+
+    public void logout(String rawRefreshToken) {
+        if (rawRefreshToken != null && !rawRefreshToken.isBlank()) {
+            refreshTokenService.revokeRefreshToken(rawRefreshToken);
+        }
+        System.out.println("[Auth] User logged out");
     }
 
     public AuthResponse getCurrentUser(Long userId) {
@@ -139,7 +183,35 @@ public class AuthService {
                 .orElseThrow(() -> new EntityNotFoundException("User not found: " + userId));
         Company company = companyRepository.findById(user.getCompanyId())
                 .orElseThrow(() -> new EntityNotFoundException("Company not found"));
-        return buildAuthResponse(user, company, null);
+        return AuthResponse.builder()
+                .email(user.getEmail())
+                .name(user.getName())
+                .role(user.getRole().name())
+                .companyId(user.getCompanyId())
+                .companyName(company.getName())
+                .build();
+    }
+
+    private Map<String, Object> buildTokenResponse(User user, Company company) {
+        String accessToken = jwtUtil.generateAccessToken(user);
+
+        RefreshToken refreshToken = refreshTokenService.createRefreshToken(
+                user.getId(), user.getCompanyId());
+        String rawRefreshToken = refreshToken.getTokenHash();
+
+        AuthResponse authResponse = AuthResponse.builder()
+                .accessToken(accessToken)
+                .email(user.getEmail())
+                .name(user.getName())
+                .role(user.getRole().name())
+                .companyId(user.getCompanyId())
+                .companyName(company.getName())
+                .build();
+
+        String cookie = refreshTokenService.buildRefreshCookie(
+                rawRefreshToken, jwtUtil.getRefreshTokenExpirationDays());
+
+        return Map.of("authResponse", authResponse, "cookie", cookie);
     }
 
     private String generateUniqueSlug(String companyName) {
@@ -156,16 +228,5 @@ public class AuthService {
             suffix++;
         }
         return base + "-" + suffix;
-    }
-
-    private AuthResponse buildAuthResponse(User user, Company company, String token) {
-        return AuthResponse.builder()
-                .token(token)
-                .email(user.getEmail())
-                .name(user.getName())
-                .role(user.getRole().name())
-                .companyId(user.getCompanyId())
-                .companyName(company.getName())
-                .build();
     }
 }

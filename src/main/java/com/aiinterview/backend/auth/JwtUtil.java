@@ -11,7 +11,11 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Date;
 
 @Component
@@ -23,11 +27,17 @@ public class JwtUtil {
     @Value("${app.jwt.expiration-ms}")
     private long expirationMs;
 
+    @Value("${app.jwt.access-token-expiration-ms:900000}")
+    private long accessTokenExpirationMs;
+
+    @Value("${app.jwt.refresh-token-expiration-days:7}")
+    private int refreshTokenExpirationDays;
+
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
-    public String generateToken(User user) {
+    public String generateAccessToken(User user) {
         Date now = new Date();
         return Jwts.builder()
                 .subject(user.getId().toString())
@@ -35,9 +45,29 @@ public class JwtUtil {
                 .claim("role", user.getRole().name())
                 .claim("email", user.getEmail())
                 .issuedAt(now)
-                .expiration(new Date(now.getTime() + expirationMs))
+                .expiration(new Date(now.getTime() + accessTokenExpirationMs))
                 .signWith(getSigningKey(), Jwts.SIG.HS256)
                 .compact();
+    }
+
+    public String generateRefreshToken() {
+        byte[] bytes = new byte[64];
+        new SecureRandom().nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    public String hashToken(String token) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
+            return Base64.getEncoder().encodeToString(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("SHA-256 not available", e);
+        }
+    }
+
+    public int getRefreshTokenExpirationDays() {
+        return refreshTokenExpirationDays;
     }
 
     public boolean validateToken(String token) {
