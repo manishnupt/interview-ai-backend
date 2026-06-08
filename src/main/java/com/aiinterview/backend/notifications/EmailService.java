@@ -27,8 +27,8 @@ public class EmailService {
 
     private void send(String toEmail, String toName,
                       String subject, String htmlBody) {
-        if (apiKey == null || apiKey.isBlank()) {
-            System.out.println("[Email STUB] No API key — " + subject
+        if (apiKey == null || apiKey.isBlank() || apiKey.equals("xxxx")) {
+            System.out.println("[Email STUB] SendGrid API key not configured — " + subject
                 + " → " + toEmail);
             return;
         }

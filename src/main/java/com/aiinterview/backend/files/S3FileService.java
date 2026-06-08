@@ -1,6 +1,8 @@
 package com.aiinterview.backend.files;
 
 import com.aiinterview.backend.common.BusinessException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,7 @@ import java.util.UUID;
 @Service
 public class S3FileService {
 
+    private static final Logger log = LoggerFactory.getLogger(S3FileService.class);
     private static final long MAX_FILE_SIZE = 5 * 1024 * 1024;
 
     @Autowired
@@ -43,6 +46,9 @@ public class S3FileService {
             jobId, candidateId, candidateId,
             UUID.randomUUID().toString().substring(0, 8));
 
+        log.info("[S3] uploadResume — bucket='{}' key='{}' sizeBytes={} contentType='{}'",
+            bucketName, key, file.getSize(), file.getContentType());
+
         try {
             PutObjectRequest putRequest = PutObjectRequest.builder()
                 .bucket(bucketName)
@@ -56,20 +62,33 @@ public class S3FileService {
                     file.getInputStream(),
                     file.getSize()));
 
-            System.out.println("[S3] Uploaded: " + key
-                + " (" + file.getSize() + " bytes)");
-
+            log.info("[S3] Upload succeeded — key='{}' sizeBytes={}", key, file.getSize());
             return key;
 
         } catch (S3Exception e) {
-            System.out.println("[S3] Upload failed: "
-                + e.awsErrorDetails().errorMessage());
-            throw new BusinessException(
-                "Failed to upload resume: "
-                + e.awsErrorDetails().errorMessage());
+            String errorCode    = e.awsErrorDetails().errorCode();
+            String errorMessage = e.awsErrorDetails().errorMessage();
+            int    httpStatus   = e.statusCode();
+            String requestId    = e.requestId();
+            // x-amz-bucket-region tells you the ACTUAL bucket region on a PermanentRedirect
+            String actualRegion = e.awsErrorDetails()
+                .sdkHttpResponse()
+                .firstMatchingHeader("x-amz-bucket-region")
+                .orElse("header-not-present");
+
+            log.error("[S3] Upload failed — bucket='{}' configuredRegion='{}' " +
+                      "errorCode='{}' httpStatus={} requestId='{}' " +
+                      "actualBucketRegion='{}' message='{}'",
+                bucketName, e.awsErrorDetails().serviceName(),
+                errorCode, httpStatus, requestId,
+                actualRegion, errorMessage);
+
+            throw new BusinessException("Failed to upload resume: " + errorMessage);
+
         } catch (IOException e) {
-            throw new BusinessException(
-                "Failed to read resume file: " + e.getMessage());
+            log.error("[S3] Failed to read resume stream — candidateId={} jobId={} error='{}'",
+                candidateId, jobId, e.getMessage(), e);
+            throw new BusinessException("Failed to read resume file: " + e.getMessage());
         }
     }
 
@@ -91,11 +110,11 @@ public class S3FileService {
                 s3Presigner.presignGetObject(presignRequest);
 
             String url = presigned.url().toString();
-            System.out.println("[S3] Presigned URL generated for: " + s3Key);
+            log.info("[S3] Presigned URL generated — key='{}'", s3Key);
             return url;
 
         } catch (AwsServiceException e) {
-            System.out.println("[S3] Presign failed: " + e.getMessage());
+            log.error("[S3] Presign failed — key='{}' error='{}'", s3Key, e.getMessage());
             throw new BusinessException(
                 "Failed to generate resume URL: " + e.getMessage());
         }
@@ -111,11 +130,11 @@ public class S3FileService {
                 .build();
 
             s3Client.deleteObject(deleteRequest);
-            System.out.println("[S3] Deleted: " + s3Key);
+            log.info("[S3] Deleted — key='{}'", s3Key);
 
         } catch (S3Exception e) {
-            System.out.println("[S3] Delete failed: "
-                + e.awsErrorDetails().errorMessage());
+            log.error("[S3] Delete failed — key='{}' error='{}'",
+                s3Key, e.awsErrorDetails().errorMessage());
         }
     }
 

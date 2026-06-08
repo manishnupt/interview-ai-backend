@@ -30,6 +30,7 @@ public class S3Config {
             .region(Region.of(region))
             .credentialsProvider(
                 StaticCredentialsProvider.create(credentials))
+            .crossRegionAccessEnabled(true)
             .build();
     }
 
