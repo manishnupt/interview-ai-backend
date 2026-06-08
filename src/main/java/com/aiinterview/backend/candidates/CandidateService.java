@@ -60,7 +60,9 @@ public class CandidateService {
             try {
                 String s3Key = s3FileService.uploadResume(resumeFile, candidate.getId(), job.getId());
                 candidate.setResumeS3Key(s3Key);
-                candidate.setResumeUrl(s3FileService.generatePresignedUrl(s3Key));
+                String resumeUrl = s3FileService.generatePresignedUrl(s3Key);
+                System.out.println("resumeUrl: " + resumeUrl);
+                candidate.setResumeUrl(resumeUrl);
                 candidate = candidateRepository.save(candidate);
             } catch (BusinessException e) {
                 System.out.println("[Candidate] Resume upload failed: "
