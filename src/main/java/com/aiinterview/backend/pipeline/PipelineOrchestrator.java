@@ -14,8 +14,13 @@ import com.aiinterview.backend.notifications.EmailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import org.springframework.beans.factory.annotation.Qualifier;
+
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Semaphore;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +32,10 @@ public class PipelineOrchestrator {
     private final AiServiceClient aiServiceClient;
     private final EmailService emailService;
     private final S3FileService s3FileService;
+    @Qualifier("screeningExecutor")
+    private final Executor screeningExecutor;
+    @Qualifier("interviewSemaphore")
+    private final Semaphore interviewSemaphore;
 
     /**
      * Screens a single candidate against their job description.
@@ -34,7 +43,8 @@ public class PipelineOrchestrator {
      * Stores the result and updates candidate status.
      */
     public void screenCandidate(Candidate candidate) {
-        System.out.println("[Pipeline] Screening: "
+        String thread = Thread.currentThread().getName();
+        System.out.println("[" + thread + "] [Screener] Starting: "
             + candidate.getName()
             + " (id=" + candidate.getId() + ")");
 
@@ -110,24 +120,23 @@ public class PipelineOrchestrator {
                 candidateRepository.save(candidate);
                 emailService.sendShortlistEmail(
                     candidate.getEmail(), candidate.getName());
-                System.out.println("[Pipeline] ✓ SHORTLISTED: "
-                    + candidate.getName()
-                    + " | Score: " + result.getScore()
-                    + "/" + job.getScreeningThreshold()
-                    + " | Match: " + result.getMatchPercentage() + "%");
+                System.out.println("[" + thread + "] [Screener] Score: "
+                    + result.getScore() + "/10"
+                    + " | Match: " + result.getMatchPercentage() + "%"
+                    + " | Fit: true → SHORTLISTED: " + candidate.getName());
             } else {
                 candidate.setStatus(CandidateStatus.REJECTED);
                 candidateRepository.save(candidate);
                 emailService.sendRejectionEmail(
                     candidate.getEmail(), candidate.getName());
-                System.out.println("[Pipeline] ✗ REJECTED: "
-                    + candidate.getName()
-                    + " | Score: " + result.getScore()
-                    + "/" + job.getScreeningThreshold());
+                System.out.println("[" + thread + "] [Screener] Score: "
+                    + result.getScore() + "/10"
+                    + " | Match: " + result.getMatchPercentage() + "%"
+                    + " | Fit: false → REJECTED: " + candidate.getName());
             }
 
         } catch (Exception e) {
-            System.out.println("[Pipeline] Screening failed for "
+            System.out.println("[" + thread + "] [Screener] FAILED for "
                 + candidate.getName() + ": " + e.getMessage());
             candidate.setStatus(CandidateStatus.APPLIED);
             candidateRepository.save(candidate);
@@ -138,12 +147,29 @@ public class PipelineOrchestrator {
      * Triggers an AI voice interview for a shortlisted candidate.
      * Returns immediately — interview runs async in Python.
      * Report comes back via /api/callbacks/interview-complete.
+     * Semaphore caps concurrent outbound Twilio calls.
      */
     public void triggerInterview(Candidate candidate) {
-        System.out.println("[Pipeline] Triggering interview for: "
+        System.out.println("[Pipeline] Requesting interview slot for: "
             + candidate.getName());
 
+        boolean acquired = false;
         try {
+            acquired = interviewSemaphore
+                .tryAcquire(10, java.util.concurrent.TimeUnit.SECONDS);
+
+            if (!acquired) {
+                System.out.println("[Pipeline] No interview slots available for "
+                    + candidate.getName()
+                    + " — will retry next scheduler run");
+                return;
+            }
+
+            System.out.println("[Pipeline] Interview slot acquired for: "
+                + candidate.getName()
+                + " | Available slots: "
+                + interviewSemaphore.availablePermits());
+
             Job job = jobRepository
                 .findById(candidate.getJobId())
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -165,64 +191,100 @@ public class PipelineOrchestrator {
                 aiServiceClient.triggerInterview(req);
 
             if (response != null) {
-                // Mark as HR_REVIEW temporarily while call is in progress
                 candidate.setStatus(CandidateStatus.HR_REVIEW);
                 candidateRepository.save(candidate);
                 System.out.println("[Pipeline] Interview call initiated: "
-                    + response.getCallSid());
+                    + response.getCallSid()
+                    + " | Remaining slots: "
+                    + interviewSemaphore.availablePermits());
             }
 
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            System.out.println("[Pipeline] Interview trigger interrupted for: "
+                + candidate.getName());
         } catch (Exception e) {
             System.out.println("[Pipeline] Interview trigger failed for "
                 + candidate.getName() + ": " + e.getMessage());
+        } finally {
+            // Release after call is INITIATED, not after it ends.
+            // The Python service runs the call async; completion
+            // arrives via /api/callbacks/interview-complete.
+            if (acquired) {
+                interviewSemaphore.release();
+                System.out.println("[Pipeline] Interview slot released for: "
+                    + candidate.getName());
+            }
         }
     }
 
     /**
      * Runs the full screening batch.
      * Called by scheduler every 30 minutes.
-     * Processes all APPLIED candidates across all companies.
+     * Processes all APPLIED candidates across all companies in parallel.
+     * Uses screeningExecutor directly to avoid @Async self-invocation bypass.
      */
     public void runScreeningBatch() {
-        System.out.println("[Pipeline] === Starting screening batch ===");
+        System.out.println("[Pipeline] === Starting parallel screening batch ===");
+        long startTime = System.currentTimeMillis();
 
         List<Candidate> pending = candidateRepository
             .findAllByStatus(CandidateStatus.APPLIED);
 
-        System.out.println("[Pipeline] Found " + pending.size()
-            + " candidates to screen");
-
-        int screened = 0;
-        int shortlisted = 0;
-        int rejected = 0;
-        int errors = 0;
-
-        for (Candidate candidate : pending) {
-            try {
-                screenCandidate(candidate);
-
-                // Reload to get updated status
-                candidate = candidateRepository
-                    .findById(candidate.getId())
-                    .orElse(candidate);
-
-                screened++;
-                if (candidate.getStatus() == CandidateStatus.SHORTLISTED) {
-                    shortlisted++;
-                } else if (candidate.getStatus() == CandidateStatus.REJECTED) {
-                    rejected++;
-                }
-            } catch (Exception e) {
-                errors++;
-                System.out.println("[Pipeline] Error processing candidate "
-                    + candidate.getId() + ": " + e.getMessage());
-            }
+        if (pending.isEmpty()) {
+            System.out.println("[Pipeline] No candidates to screen");
+            return;
         }
 
+        System.out.println("[Pipeline] Screening " + pending.size()
+            + " candidates in parallel");
+
+        List<CompletableFuture<ScreeningResult>> futures = pending.stream()
+            .map(candidate -> CompletableFuture.supplyAsync(
+                () -> {
+                    screenCandidate(candidate);
+                    return screeningResultRepository
+                        .findByCandidateId(candidate.getId())
+                        .orElse(null);
+                },
+                screeningExecutor
+            ))
+            .toList();
+
+        CompletableFuture<Void> allOf =
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
+
+        try {
+            allOf.get(5, java.util.concurrent.TimeUnit.MINUTES);
+        } catch (java.util.concurrent.TimeoutException e) {
+            System.out.println("[Pipeline] Batch timed out after 5 minutes");
+        } catch (Exception e) {
+            System.out.println("[Pipeline] Batch error: " + e.getMessage());
+        }
+
+        long elapsed = System.currentTimeMillis() - startTime;
+        long completed = futures.stream()
+            .filter(f -> f.isDone() && !f.isCompletedExceptionally())
+            .count();
+        long failed = futures.stream()
+            .filter(CompletableFuture::isCompletedExceptionally)
+            .count();
+
+        long shortlisted = pending.stream()
+            .map(c -> candidateRepository.findById(c.getId()).orElse(c))
+            .filter(c -> c.getStatus() == CandidateStatus.SHORTLISTED)
+            .count();
+        long rejected = pending.stream()
+            .map(c -> candidateRepository.findById(c.getId()).orElse(c))
+            .filter(c -> c.getStatus() == CandidateStatus.REJECTED)
+            .count();
+
         System.out.println("[Pipeline] === Batch complete ===");
-        System.out.println("[Pipeline] Screened: " + screened
+        System.out.println("[Pipeline] Total: " + pending.size()
             + " | Shortlisted: " + shortlisted
             + " | Rejected: " + rejected
-            + " | Errors: " + errors);
+            + " | Errors: " + failed
+            + " | Time: " + elapsed + "ms"
+            + " (avg " + (elapsed / Math.max(1, pending.size())) + "ms/candidate)");
     }
 }

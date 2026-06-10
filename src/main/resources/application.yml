@@ -11,6 +11,13 @@ spring:
     username: ${PGUSER:postgres}
     password: ${PGPASSWORD:admin}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: AIInterviewPool
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
   jpa:
     hibernate:
       ddl-auto: validate
@@ -44,3 +51,6 @@ app:
     api-key: ${SENDGRID_API_KEY:xxxx}
     from-email: noreply@aiinterview.com
     from-name: AI Interview Platform
+  pipeline:
+    screening-threads: 10
+    interview-concurrency: 5

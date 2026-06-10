@@ -5,11 +5,14 @@ import com.aiinterview.backend.candidates.CandidateRepository;
 import com.aiinterview.backend.candidates.CandidateStatus;
 import com.aiinterview.backend.candidates.InterviewReportRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 
 @Component
 @RequiredArgsConstructor
@@ -19,6 +22,8 @@ public class PipelineScheduler {
     private final AiServiceClient aiServiceClient;
     private final CandidateRepository candidateRepository;
     private final InterviewReportRepository interviewReportRepository;
+    @Qualifier("screeningExecutor")
+    private final Executor screeningExecutor;
 
     /**
      * Runs resume screening every 30 minutes.
@@ -40,30 +45,40 @@ public class PipelineScheduler {
      * Triggers interviews for all SHORTLISTED candidates
      * who do not yet have an interview report.
      * Runs every 15 minutes.
+     * Semaphore in triggerInterview() caps concurrent Twilio calls.
      */
     @Scheduled(fixedDelay = 15 * 60 * 1000)
     public void scheduledInterviewTrigger() {
-        System.out.println("[Scheduler] Checking for shortlisted candidates...");
-        try {
-            List<Candidate> shortlisted = candidateRepository
-                .findAllByStatus(CandidateStatus.SHORTLISTED);
+        System.out.println("[Scheduler] Checking shortlisted candidates...");
 
-            List<Candidate> needsInterview = shortlisted.stream()
-                .filter(c -> interviewReportRepository
-                    .findByCandidateId(c.getId())
-                    .isEmpty())
-                .toList();
+        List<Candidate> shortlisted = candidateRepository
+            .findAllByStatus(CandidateStatus.SHORTLISTED);
 
-            System.out.println("[Scheduler] Found " + needsInterview.size()
-                + " candidates needing interviews");
+        List<Candidate> needsInterview = shortlisted.stream()
+            .filter(c -> interviewReportRepository
+                .findByCandidateId(c.getId())
+                .isEmpty())
+            .toList();
 
-            for (Candidate candidate : needsInterview) {
-                orchestrator.triggerInterview(candidate);
-                Thread.sleep(5000);
-            }
-        } catch (Exception e) {
-            System.out.println("[Scheduler] Interview trigger failed: "
-                + e.getMessage());
+        if (needsInterview.isEmpty()) {
+            System.out.println("[Scheduler] No candidates need interviews");
+            return;
         }
+
+        System.out.println("[Scheduler] Triggering interviews for "
+            + needsInterview.size() + " candidates");
+
+        List<CompletableFuture<Void>> futures = needsInterview.stream()
+            .map(candidate -> CompletableFuture.runAsync(
+                () -> orchestrator.triggerInterview(candidate),
+                screeningExecutor
+            ))
+            .toList();
+
+        CompletableFuture.allOf(
+            futures.toArray(new CompletableFuture[0])
+        ).join();
+
+        System.out.println("[Scheduler] Interview trigger batch complete");
     }
 }

@@ -15,6 +15,8 @@ public interface CandidateRepository extends JpaRepository<Candidate, Long> {
 
     List<Candidate> findAllByStatus(CandidateStatus status);
 
+    long countByStatus(CandidateStatus status);
+
     List<Candidate> findAllByStatusAndCompanyId(CandidateStatus status, Long companyId);
 
     List<Candidate> findAllByCompanyIdAndStatus(Long companyId, CandidateStatus status);

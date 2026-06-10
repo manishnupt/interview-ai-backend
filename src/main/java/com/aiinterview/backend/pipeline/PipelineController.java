@@ -9,6 +9,7 @@ import com.aiinterview.backend.common.BusinessException;
 import com.aiinterview.backend.common.ResourceNotFoundException;
 import com.aiinterview.backend.common.SecurityUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Semaphore;
 
 @RestController
 @RequestMapping("/api/pipeline")
@@ -25,6 +27,8 @@ public class PipelineController {
     private final PipelineOrchestrator orchestrator;
     private final CandidateRepository candidateRepository;
     private final AiServiceClient aiServiceClient;
+    @Qualifier("interviewSemaphore")
+    private final Semaphore interviewSemaphore;
 
     /**
      * Manually triggers screening batch.
@@ -80,6 +84,32 @@ public class PipelineController {
                 "candidateId", candidateId,
                 "candidateName", candidate.getName(),
                 "status", "initiated"
+            )
+        ));
+    }
+
+    /**
+     * Live batch status — candidate counts by pipeline stage
+     * plus current interview semaphore availability.
+     */
+    @GetMapping("/screening-status")
+    @PreAuthorize("hasAnyRole('COMPANY_ADMIN','SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> screeningStatus() {
+        long applied = candidateRepository.countByStatus(CandidateStatus.APPLIED);
+        long screening = candidateRepository.countByStatus(CandidateStatus.SCREENING);
+        long shortlisted = candidateRepository.countByStatus(CandidateStatus.SHORTLISTED);
+        long rejected = candidateRepository.countByStatus(CandidateStatus.REJECTED);
+        int availableInterviewSlots = interviewSemaphore.availablePermits();
+
+        return ResponseEntity.ok(ApiResponse.ok(
+            Map.of(
+                "pending", applied,
+                "currentlyScreening", screening,
+                "shortlisted", shortlisted,
+                "rejected", rejected,
+                "availableInterviewSlots", availableInterviewSlots,
+                "maxInterviewSlots", 5,
+                "checkedAt", LocalDateTime.now().toString()
             )
         ));
     }
