@@ -49,7 +49,7 @@ com.aiinterview.backend
 - ALWAYS use ResponseEntity in controllers
 
 ## Key ports
-- Spring Boot: 4040
+- Spring Boot: 8099 (overridden in application.properties; application.yml says 4040 but .properties wins)
 - Python AI service: 8000
 - React frontend: 5173
 - PostgreSQL: 5434
@@ -92,3 +92,35 @@ Aggregation is computed by a nightly @Scheduled job, not live
 on every request. The admin dashboard reads from 
 usage_daily_summary, never directly from usage_records 
 for display (only for CSV export/drill-down).
+
+## Tenant Management API (Sprint 22)
+Super Admin-only endpoints that consolidate three things 
+into one cohesive API surface:
+1. Tenant onboarding (replaces public /api/auth/register 
+   as the primary path going forward — admin creates tenants)
+2. Usage visibility (reads from usage_records / usage_daily_summary 
+   built in Sprint 21)
+3. User administration (add users to any tenant without 
+   requiring self-invite flow)
+
+All endpoints under /api/admin/tenants/** — already covered 
+by the @PreAuthorize("hasRole('SUPER_ADMIN')") pattern and 
+the accessDeniedHandler from Sprint 21.
+
+Hard rule: every endpoint here can see across ALL companies — 
+this is the one place in the app where company_id scoping is 
+intentionally bypassed. Every method must be triple-checked 
+for SUPER_ADMIN-only access since a leak here exposes every 
+tenant's data.
+
+The existing /api/auth/register stays functional for now 
+(self-serve signup) — Sprint 23 will decide whether to keep 
+both paths or deprecate self-serve.
+
+## Seed credentials (local dev only)
+admin@aiinterview.com / password   (SUPER_ADMIN)
+hr@acmetech.com / password          (COMPANY_ADMIN)
+
+These are set via V4-fix-seed-passwords.xml using 
+BCryptPasswordEncoder(10). Never use these patterns 
+in any non-local environment.
