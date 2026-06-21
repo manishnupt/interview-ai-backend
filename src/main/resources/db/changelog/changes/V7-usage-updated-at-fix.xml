@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+  <!-- Patches DBs where V6 ran before updated_at was added to the createTable.
+       Skipped automatically on DBs where V6 already includes the column. -->
+
+  <changeSet id="18-add-updated-at-usage-records" author="system">
+    <preConditions onFail="MARK_RAN">
+      <not>
+        <columnExists tableName="usage_records" columnName="updated_at"/>
+      </not>
+    </preConditions>
+    <addColumn tableName="usage_records">
+      <column name="updated_at" type="TIMESTAMP"
+        defaultValueComputed="NOW()">
+        <constraints nullable="false"/>
+      </column>
+    </addColumn>
+  </changeSet>
+
+  <changeSet id="19-add-updated-at-usage-summary" author="system">
+    <preConditions onFail="MARK_RAN">
+      <not>
+        <columnExists tableName="usage_daily_summary" columnName="updated_at"/>
+      </not>
+    </preConditions>
+    <addColumn tableName="usage_daily_summary">
+      <column name="updated_at" type="TIMESTAMP"
+        defaultValueComputed="NOW()">
+        <constraints nullable="false"/>
+      </column>
+    </addColumn>
+  </changeSet>
+
+</databaseChangeLog>

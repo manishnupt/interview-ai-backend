@@ -10,14 +10,18 @@ import com.aiinterview.backend.candidates.InterviewReportRepository;
 import com.aiinterview.backend.common.ApiResponse;
 import com.aiinterview.backend.common.ResourceNotFoundException;
 import com.aiinterview.backend.notifications.EmailService;
+import com.aiinterview.backend.usage.UsageRecord;
+import com.aiinterview.backend.usage.UsageRecordRepository;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/callbacks")
@@ -28,6 +32,7 @@ public class CallbackController {
     private final InterviewReportRepository interviewReportRepository;
     private final EmailService emailService;
     private final UserRepository userRepository;
+    private final UsageRecordRepository usageRecordRepository;
 
     @Data
     @NoArgsConstructor
@@ -45,6 +50,7 @@ public class CallbackController {
         private String fullTranscript;
         private String rawJson;
         private String errorMessage;
+        private Map<String, Object> usageMetrics;  // flexible map, Python field names vary
     }
 
     @PostMapping("/interview-complete")
@@ -53,6 +59,9 @@ public class CallbackController {
     ) {
         System.out.println("[Callback] Received interview callback for candidate: "
             + req.getCandidateId() + " | status: " + req.getStatus());
+
+        // Save usage data first, regardless of outcome
+        saveUsageRecord(req);
 
         try {
             Candidate candidate = candidateRepository
@@ -104,6 +113,66 @@ public class CallbackController {
         }
 
         return ResponseEntity.ok(ApiResponse.ok("Callback processed", null));
+    }
+
+    private void saveUsageRecord(InterviewCallbackRequest req) {
+        if (req.getUsageMetrics() == null) {
+            System.out.println("[Usage] No usage metrics in callback for candidate: "
+                + req.getCandidateId());
+            return;
+        }
+
+        try {
+            Map<String, Object> m = req.getUsageMetrics();
+
+            UsageRecord record = new UsageRecord();
+            record.setCompanyId(req.getCompanyId());
+            record.setJobId(req.getJobId());
+            record.setCandidateId(req.getCandidateId());
+            record.setCallSid(req.getCallSid());
+            record.setUsageType((String) m.getOrDefault("type", "interview"));
+            record.setRateCardVersion((String) m.get("rateCardVersion"));
+            record.setDurationSeconds(toDouble(m.get("durationSeconds")));
+            record.setTtsCharacters(toInt(m.get("ttsCharacters")));
+            record.setSttWords(toInt(m.get("sttWords")));
+            record.setLlmInputTokens(toInt(m.get("llmInputTokens")));
+            record.setLlmOutputTokens(toInt(m.get("llmOutputTokens")));
+            record.setGptCallCount(toInt(m.get("gptCallCount")));
+            record.setQuestionsAsked(toInt(m.get("questionsAsked")));
+            record.setOutcome((String) m.getOrDefault("outcome", req.getStatus()));
+            record.setTwilioCostUsd(toBigDecimal(m.get("twilioCostUsd")));
+            record.setDeepgramCostUsd(toBigDecimal(m.get("deepgramCostUsd")));
+            record.setElevenlabsCostUsd(toBigDecimal(m.get("elevenlabsCostUsd")));
+            record.setOpenaiCostUsd(toBigDecimal(m.get("openaiCostUsd")));
+            record.setTotalCostUsd(toBigDecimal(m.get("totalCostUsd")));
+
+            usageRecordRepository.save(record);
+
+            System.out.println("[Usage] Saved record for candidate "
+                + req.getCandidateId() + " | cost: $" + record.getTotalCostUsd());
+
+        } catch (Exception e) {
+            // Usage tracking failures must NEVER affect interview report processing
+            System.out.println("[Usage] Failed to save usage record: " + e.getMessage());
+        }
+    }
+
+    private Double toDouble(Object o) {
+        if (o == null) return 0.0;
+        if (o instanceof Number) return ((Number) o).doubleValue();
+        return 0.0;
+    }
+
+    private Integer toInt(Object o) {
+        if (o == null) return 0;
+        if (o instanceof Number) return ((Number) o).intValue();
+        return 0;
+    }
+
+    private BigDecimal toBigDecimal(Object o) {
+        if (o == null) return BigDecimal.ZERO;
+        if (o instanceof Number) return BigDecimal.valueOf(((Number) o).doubleValue());
+        return BigDecimal.ZERO;
     }
 
     private void notifyHrTeam(Long companyId, String candidateName, int score) {

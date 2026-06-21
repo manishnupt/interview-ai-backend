@@ -11,10 +11,14 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -59,9 +63,34 @@ public class SecurityConfig {
                             res.setContentType("application/json");
                             res.getWriter().write("{\"success\":false,\"message\":\"Unauthorized\",\"data\":null}");
                         })
+                        .accessDeniedHandler(accessDeniedHandler())
                 );
 
         return http.build();
+    }
+
+    @Bean
+    public AccessDeniedHandler accessDeniedHandler() {
+        return (request, response, ex) -> {
+            AuthenticatedUser user = null;
+            try {
+                user = (AuthenticatedUser) SecurityContextHolder
+                    .getContext().getAuthentication().getPrincipal();
+            } catch (Exception ignored) {}
+
+            System.out.println("[Security] Access denied — "
+                + "user: " + (user != null ? user.email() : "unknown")
+                + " | role: " + (user != null ? user.role() : "unknown")
+                + " | path: " + request.getRequestURI());
+
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.setContentType("application/json");
+            response.getWriter().write(
+                "{\"success\":false,\"message\":"
+                + "\"You do not have permission to access this resource\","
+                + "\"data\":null}"
+            );
+        };
     }
 
     @Bean

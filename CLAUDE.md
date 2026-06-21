@@ -73,3 +73,22 @@ Local dev uses application-local.yml for overrides.
 - /api/admin/** → SUPER_ADMIN only
 - /api/** → authenticated (any role)
 - CORS: allow http://localhost:5173 in dev
+
+## Usage storage (Sprint 21)
+Python sends usageMetrics as part of the existing 
+/api/callbacks/interview-complete payload, and as a new
+field in the /screen response (consumed by PipelineOrchestrator).
+
+New tables:
+- usage_records — one row per interview or screening call
+- usage_daily_summary — pre-aggregated per company per day
+- plan_limits — per-company monthly caps (used in Sprint 24)
+
+Hard rule: usage tracking must NEVER block or fail the main
+flow. If usageMetrics is null or malformed, log it and continue —
+never throw an exception that affects candidate status updates.
+
+Aggregation is computed by a nightly @Scheduled job, not live
+on every request. The admin dashboard reads from 
+usage_daily_summary, never directly from usage_records 
+for display (only for CSV export/drill-down).

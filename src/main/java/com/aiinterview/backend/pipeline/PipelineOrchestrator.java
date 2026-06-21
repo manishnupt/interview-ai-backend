@@ -11,13 +11,17 @@ import com.aiinterview.backend.files.S3FileService;
 import com.aiinterview.backend.jobs.Job;
 import com.aiinterview.backend.jobs.JobRepository;
 import com.aiinterview.backend.notifications.EmailService;
+import com.aiinterview.backend.usage.UsageRecord;
+import com.aiinterview.backend.usage.UsageRecordRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Semaphore;
@@ -32,6 +36,7 @@ public class PipelineOrchestrator {
     private final AiServiceClient aiServiceClient;
     private final EmailService emailService;
     private final S3FileService s3FileService;
+    private final UsageRecordRepository usageRecordRepository;
     @Qualifier("screeningExecutor")
     private final Executor screeningExecutor;
     @Qualifier("interviewSemaphore")
@@ -111,6 +116,37 @@ public class PipelineOrchestrator {
                 ? String.join(" | ", result.getMissingSkills()) : "");
             screening.setScreenedAt(LocalDateTime.now());
             screeningResultRepository.save(screening);
+
+            // Save usage record for the screening call
+            if (result.getUsageMetrics() != null) {
+                try {
+                    Map<String, Object> m = result.getUsageMetrics();
+                    UsageRecord record = new UsageRecord();
+                    record.setCompanyId(job.getCompanyId());
+                    record.setJobId(job.getId());
+                    record.setCandidateId(candidate.getId());
+                    record.setUsageType("screening");
+                    record.setRateCardVersion((String) m.get("rateCardVersion"));
+                    record.setLlmInputTokens(
+                        m.get("llmInputTokens") != null
+                            ? ((Number) m.get("llmInputTokens")).intValue() : 0);
+                    record.setLlmOutputTokens(
+                        m.get("llmOutputTokens") != null
+                            ? ((Number) m.get("llmOutputTokens")).intValue() : 0);
+                    record.setGptCallCount(
+                        m.get("gptCallCount") != null
+                            ? ((Number) m.get("gptCallCount")).intValue() : 1);
+                    record.setOutcome("completed");
+                    record.setTotalCostUsd(
+                        m.get("totalCostUsd") != null
+                            ? BigDecimal.valueOf(((Number) m.get("totalCostUsd")).doubleValue())
+                            : BigDecimal.ZERO);
+                    usageRecordRepository.save(record);
+                    System.out.println("[Usage] Screening cost: $" + record.getTotalCostUsd());
+                } catch (Exception e) {
+                    System.out.println("[Usage] Failed to save screening usage: " + e.getMessage());
+                }
+            }
 
             // Decide fit based on job threshold
             boolean passes = result.getScore() >= job.getScreeningThreshold();

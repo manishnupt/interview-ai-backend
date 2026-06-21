@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+  <changeSet id="15-create-usage-records" author="system">
+    <createTable tableName="usage_records">
+      <column name="id" type="BIGSERIAL">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="company_id" type="BIGINT">
+        <constraints nullable="false"
+          foreignKeyName="fk_usage_company"
+          references="companies(id)"/>
+      </column>
+      <column name="job_id" type="BIGINT"/>
+      <column name="candidate_id" type="BIGINT"/>
+      <column name="call_sid" type="VARCHAR(255)"/>
+      <column name="usage_type" type="VARCHAR(50)">
+        <constraints nullable="false"/>
+      </column>
+      <column name="rate_card_version" type="VARCHAR(50)"/>
+      <column name="duration_seconds" type="DOUBLE" defaultValueNumeric="0">
+        <constraints nullable="false"/>
+      </column>
+      <column name="tts_characters" type="INT" defaultValueNumeric="0"/>
+      <column name="stt_words" type="INT" defaultValueNumeric="0"/>
+      <column name="llm_input_tokens" type="INT" defaultValueNumeric="0"/>
+      <column name="llm_output_tokens" type="INT" defaultValueNumeric="0"/>
+      <column name="gpt_call_count" type="INT" defaultValueNumeric="0"/>
+      <column name="questions_asked" type="INT" defaultValueNumeric="0"/>
+      <column name="outcome" type="VARCHAR(50)"/>
+      <column name="twilio_cost_usd" type="DECIMAL(10,6)" defaultValueNumeric="0"/>
+      <column name="deepgram_cost_usd" type="DECIMAL(10,6)" defaultValueNumeric="0"/>
+      <column name="elevenlabs_cost_usd" type="DECIMAL(10,6)" defaultValueNumeric="0"/>
+      <column name="openai_cost_usd" type="DECIMAL(10,6)" defaultValueNumeric="0"/>
+      <column name="total_cost_usd" type="DECIMAL(10,6)" defaultValueNumeric="0">
+        <constraints nullable="false"/>
+      </column>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="NOW()">
+        <constraints nullable="false"/>
+      </column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="NOW()">
+        <constraints nullable="false"/>
+      </column>
+    </createTable>
+    <createIndex tableName="usage_records" indexName="idx_usage_company">
+      <column name="company_id"/>
+    </createIndex>
+    <createIndex tableName="usage_records" indexName="idx_usage_created">
+      <column name="created_at"/>
+    </createIndex>
+    <createIndex tableName="usage_records" indexName="idx_usage_candidate">
+      <column name="candidate_id"/>
+    </createIndex>
+  </changeSet>
+
+  <changeSet id="16-create-usage-daily-summary" author="system">
+    <createTable tableName="usage_daily_summary">
+      <column name="id" type="BIGSERIAL">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="company_id" type="BIGINT">
+        <constraints nullable="false"
+          foreignKeyName="fk_summary_company"
+          references="companies(id)"/>
+      </column>
+      <column name="summary_date" type="DATE">
+        <constraints nullable="false"/>
+      </column>
+      <column name="total_interviews" type="INT" defaultValueNumeric="0"/>
+      <column name="total_screenings" type="INT" defaultValueNumeric="0"/>
+      <column name="total_minutes" type="DOUBLE" defaultValueNumeric="0"/>
+      <column name="total_tts_characters" type="BIGINT" defaultValueNumeric="0"/>
+      <column name="total_stt_words" type="BIGINT" defaultValueNumeric="0"/>
+      <column name="total_llm_tokens" type="BIGINT" defaultValueNumeric="0"/>
+      <column name="failed_count" type="INT" defaultValueNumeric="0"/>
+      <column name="total_cost_usd" type="DECIMAL(10,6)" defaultValueNumeric="0"/>
+      <column name="avg_cost_per_interview_usd" type="DECIMAL(10,6)" defaultValueNumeric="0"/>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="NOW()">
+        <constraints nullable="false"/>
+      </column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="NOW()">
+        <constraints nullable="false"/>
+      </column>
+    </createTable>
+    <addUniqueConstraint
+      tableName="usage_daily_summary"
+      columnNames="company_id, summary_date"
+      constraintName="uq_summary_company_date"/>
+    <createIndex tableName="usage_daily_summary" indexName="idx_summary_date">
+      <column name="summary_date"/>
+    </createIndex>
+  </changeSet>
+
+  <changeSet id="17-create-plan-limits" author="system">
+    <createTable tableName="plan_limits">
+      <column name="id" type="BIGSERIAL">
+        <constraints primaryKey="true" nullable="false"/>
+      </column>
+      <column name="company_id" type="BIGINT">
+        <constraints nullable="false" unique="true"
+          foreignKeyName="fk_planlimit_company"
+          references="companies(id)"/>
+      </column>
+      <column name="monthly_interview_cap" type="INT" defaultValueNumeric="50"/>
+      <column name="monthly_screening_cap" type="INT" defaultValueNumeric="500"/>
+      <column name="monthly_cost_cap_usd" type="DECIMAL(10,2)" defaultValueNumeric="50.00"/>
+      <column name="alert_threshold_pct" type="INT" defaultValueNumeric="80"/>
+      <column name="created_at" type="TIMESTAMP" defaultValueComputed="NOW()">
+        <constraints nullable="false"/>
+      </column>
+      <column name="updated_at" type="TIMESTAMP" defaultValueComputed="NOW()">
+        <constraints nullable="false"/>
+      </column>
+    </createTable>
+  </changeSet>
+
+</databaseChangeLog>

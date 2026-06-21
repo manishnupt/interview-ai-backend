@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class AiServiceClient {
@@ -47,6 +48,7 @@ public class AiServiceClient {
         @JsonProperty("fit_reasons")      private List<String> fitReasons;
                                           private List<String> concerns;
         @JsonProperty("missing_skills")   private List<String> missingSkills;
+        @JsonProperty("usage_metrics")    private Map<String, Object> usageMetrics;
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor
