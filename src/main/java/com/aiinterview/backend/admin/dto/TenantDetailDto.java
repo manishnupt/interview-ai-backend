@@ -18,6 +18,7 @@ public class TenantDetailDto {
     private String slug;
     private String plan;
     private Boolean isActive;
+    private String status;
     private LocalDateTime createdAt;
     private List<TenantUserDto> users;
     private List<TenantJobSummaryDto> jobs;

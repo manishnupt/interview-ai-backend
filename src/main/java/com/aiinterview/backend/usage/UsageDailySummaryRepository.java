@@ -14,4 +14,6 @@ public interface UsageDailySummaryRepository extends JpaRepository<UsageDailySum
 
     List<UsageDailySummary> findAllByCompanyIdAndSummaryDateBetween(
             Long companyId, LocalDate start, LocalDate end);
+
+    List<UsageDailySummary> findAllBySummaryDateBetween(LocalDate start, LocalDate end);
 }

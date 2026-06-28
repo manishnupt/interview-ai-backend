@@ -14,5 +14,6 @@
   <include file="db/changelog/changes/V5-refresh-tokens.xml"/>
   <include file="db/changelog/changes/V6-usage-tracking.xml"/>
   <include file="db/changelog/changes/V7-usage-updated-at-fix.xml"/>
+  <include file="db/changelog/changes/V8-tenant-status-enum.xml"/>
 
 </databaseChangeLog>

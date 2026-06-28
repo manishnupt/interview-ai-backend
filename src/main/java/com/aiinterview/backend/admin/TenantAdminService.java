@@ -11,6 +11,7 @@ import com.aiinterview.backend.common.BusinessException;
 import com.aiinterview.backend.common.ResourceNotFoundException;
 import com.aiinterview.backend.company.Company;
 import com.aiinterview.backend.company.CompanyRepository;
+import com.aiinterview.backend.company.CompanyStatus;
 import com.aiinterview.backend.jobs.Job;
 import com.aiinterview.backend.jobs.JobRepository;
 import com.aiinterview.backend.jobs.JobStatus;
@@ -29,7 +30,9 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -98,6 +101,7 @@ public class TenantAdminService {
                 .slug(company.getSlug())
                 .plan(company.getPlan())
                 .isActive(company.isActive())
+                .status(company.getStatus().name())
                 .createdAt(company.getCreatedAt())
                 .totalUsers(totalUsers)
                 .activeJobs(activeJobs)
@@ -196,6 +200,7 @@ public class TenantAdminService {
                 .slug(company.getSlug())
                 .plan(company.getPlan())
                 .isActive(company.isActive())
+                .status(company.getStatus().name())
                 .createdAt(company.getCreatedAt())
                 .users(users)
                 .jobs(jobs)
@@ -334,19 +339,132 @@ public class TenantAdminService {
                 .build();
     }
 
-    /**
-     * Deactivates or reactivates a tenant entirely.
-     * All users under it lose access immediately on next
-     * token refresh (since refresh checks user.isActive()
-     * indirectly via the company's own active flag —
-     * add company active check to the refresh flow if not present).
-     */
-    public void setTenantActive(Long companyId, boolean active) {
+    public void activateTenant(Long companyId) {
         Company company = companyRepository.findById(companyId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tenant not found"));
-        company.setActive(active);
+        company.setStatus(CompanyStatus.ACTIVE);
         companyRepository.save(company);
-        System.out.println("[Admin] Tenant " + company.getName() + " set active=" + active);
+        System.out.println("[Admin] Tenant " + company.getName() + " activated");
+    }
+
+    public void deactivateTenant(Long companyId) {
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tenant not found"));
+        company.setStatus(CompanyStatus.DEACTIVATED);
+        companyRepository.save(company);
+        System.out.println("[Admin] Tenant " + company.getName() + " deactivated");
+    }
+
+    public void archiveTenant(Long companyId) {
+        Company company = companyRepository.findById(companyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tenant not found"));
+        company.setStatus(CompanyStatus.ARCHIVED);
+        companyRepository.save(company);
+        System.out.println("[Admin] Tenant " + company.getName() + " archived");
+    }
+
+    public PlatformDashboardDto getPlatformDashboard() {
+        List<Company> allCompanies = companyRepository.findAll();
+
+        int active = (int) allCompanies.stream()
+                .filter(c -> c.getStatus() == CompanyStatus.ACTIVE).count();
+        int deactivated = (int) allCompanies.stream()
+                .filter(c -> c.getStatus() == CompanyStatus.DEACTIVATED).count();
+        int archived = (int) allCompanies.stream()
+                .filter(c -> c.getStatus() == CompanyStatus.ARCHIVED).count();
+
+        LocalDate monthStart = LocalDate.now().withDayOfMonth(1);
+        LocalDate today = LocalDate.now();
+
+        List<UsageDailySummary> allMonthSummaries =
+                usageDailySummaryRepository.findAllBySummaryDateBetween(monthStart, today);
+
+        int interviews = allMonthSummaries.stream()
+                .mapToInt(UsageDailySummary::getTotalInterviews).sum();
+        int screenings = allMonthSummaries.stream()
+                .mapToInt(UsageDailySummary::getTotalScreenings).sum();
+        BigDecimal totalCost = allMonthSummaries.stream()
+                .map(UsageDailySummary::getTotalCostUsd)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        Map<Long, BigDecimal> costByCompany = allMonthSummaries.stream()
+                .collect(Collectors.groupingBy(
+                        UsageDailySummary::getCompanyId,
+                        Collectors.reducing(BigDecimal.ZERO,
+                                UsageDailySummary::getTotalCostUsd, BigDecimal::add)));
+
+        Map<Long, Integer> interviewsByCompany = allMonthSummaries.stream()
+                .collect(Collectors.groupingBy(
+                        UsageDailySummary::getCompanyId,
+                        Collectors.summingInt(UsageDailySummary::getTotalInterviews)));
+
+        List<TopTenantDto> topTenants = costByCompany.entrySet().stream()
+                .sorted(Map.Entry.<Long, BigDecimal>comparingByValue().reversed())
+                .limit(5)
+                .map(entry -> {
+                    Company c = allCompanies.stream()
+                            .filter(co -> co.getId().equals(entry.getKey()))
+                            .findFirst().orElse(null);
+                    return TopTenantDto.builder()
+                            .id(entry.getKey())
+                            .name(c != null ? c.getName() : "Unknown")
+                            .costThisMonthUsd(entry.getValue())
+                            .interviewsThisMonth(
+                                    interviewsByCompany.getOrDefault(entry.getKey(), 0))
+                            .build();
+                })
+                .toList();
+
+        LocalDate thirtyDaysAgo = today.minusDays(30);
+        List<UsageDailySummary> last30Days =
+                usageDailySummaryRepository.findAllBySummaryDateBetween(thirtyDaysAgo, today);
+
+        Map<LocalDate, List<UsageDailySummary>> byDate = last30Days.stream()
+                .collect(Collectors.groupingBy(UsageDailySummary::getSummaryDate));
+
+        List<UsageDailySummaryDto> platformHistory = byDate.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> {
+                    List<UsageDailySummary> dayRecords = entry.getValue();
+                    return UsageDailySummaryDto.builder()
+                            .date(entry.getKey())
+                            .totalInterviews(dayRecords.stream()
+                                    .mapToInt(UsageDailySummary::getTotalInterviews).sum())
+                            .totalScreenings(dayRecords.stream()
+                                    .mapToInt(UsageDailySummary::getTotalScreenings).sum())
+                            .totalMinutes(dayRecords.stream()
+                                    .mapToDouble(UsageDailySummary::getTotalMinutes).sum())
+                            .totalCostUsd(dayRecords.stream()
+                                    .map(UsageDailySummary::getTotalCostUsd)
+                                    .reduce(BigDecimal.ZERO, BigDecimal::add))
+                            .build();
+                })
+                .toList();
+
+        List<TenantListItemDto> allTenantItems = listAllTenants();
+        List<TenantAlertDto> nearLimit = allTenantItems.stream()
+                .filter(t -> "warning".equals(t.getUsageStatus())
+                        || "exceeded".equals(t.getUsageStatus()))
+                .map(t -> TenantAlertDto.builder()
+                        .id(t.getId())
+                        .name(t.getName())
+                        .usagePercentage(t.getUsagePercentage())
+                        .usageStatus(t.getUsageStatus())
+                        .build())
+                .toList();
+
+        return PlatformDashboardDto.builder()
+                .totalTenants(allCompanies.size())
+                .activeTenants(active)
+                .deactivatedTenants(deactivated)
+                .archivedTenants(archived)
+                .interviewsThisMonth(interviews)
+                .screeningsThisMonth(screenings)
+                .totalCostThisMonthUsd(totalCost)
+                .topTenantsByCost(topTenants)
+                .platformUsageHistory(platformHistory)
+                .tenantsNearLimit(nearLimit)
+                .build();
     }
 
     public List<UsageRecord> exportUsageRecords(

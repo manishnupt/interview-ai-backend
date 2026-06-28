@@ -23,4 +23,13 @@ public class Company extends BaseEntity {
 
     @Column(name = "is_active", nullable = false)
     private boolean isActive;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private CompanyStatus status = CompanyStatus.ACTIVE;
+
+    public void setStatus(CompanyStatus status) {
+        this.status = status;
+        this.isActive = (status == CompanyStatus.ACTIVE);
+    }
 }

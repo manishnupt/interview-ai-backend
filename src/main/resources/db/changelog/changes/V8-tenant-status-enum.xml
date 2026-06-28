@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+  <changeSet id="20-add-company-status-column" author="system">
+    <addColumn tableName="companies">
+      <column name="status" type="VARCHAR(20)"
+        defaultValue="ACTIVE">
+        <constraints nullable="false"/>
+      </column>
+    </addColumn>
+  </changeSet>
+
+  <changeSet id="21-backfill-company-status" author="system">
+    <update tableName="companies">
+      <column name="status" value="ACTIVE"/>
+      <where>is_active = true</where>
+    </update>
+    <update tableName="companies">
+      <column name="status" value="DEACTIVATED"/>
+      <where>is_active = false</where>
+    </update>
+  </changeSet>
+
+  <changeSet id="22-index-company-status" author="system">
+    <createIndex tableName="companies" indexName="idx_company_status">
+      <column name="status"/>
+    </createIndex>
+  </changeSet>
+
+</databaseChangeLog>

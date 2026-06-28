@@ -18,6 +18,7 @@ public class TenantListItemDto {
     private String slug;
     private String plan;
     private Boolean isActive;
+    private String status;
     private LocalDateTime createdAt;
     private Integer totalUsers;
     private Integer activeJobs;

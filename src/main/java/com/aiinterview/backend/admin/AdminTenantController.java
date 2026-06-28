@@ -53,13 +53,22 @@ public class AdminTenantController {
         return ResponseEntity.status(201).body(ApiResponse.ok("User added to tenant", user));
     }
 
-    @PutMapping("/{id}/status")
-    public ResponseEntity<ApiResponse<Void>> setStatus(
-            @PathVariable Long id,
-            @RequestParam boolean active) {
-        tenantAdminService.setTenantActive(id, active);
-        String message = active ? "Tenant activated" : "Tenant deactivated";
-        return ResponseEntity.ok(ApiResponse.ok(message, null));
+    @PostMapping("/{id}/activate")
+    public ResponseEntity<ApiResponse<Void>> activate(@PathVariable Long id) {
+        tenantAdminService.activateTenant(id);
+        return ResponseEntity.ok(ApiResponse.ok("Tenant activated", null));
+    }
+
+    @PostMapping("/{id}/deactivate")
+    public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable Long id) {
+        tenantAdminService.deactivateTenant(id);
+        return ResponseEntity.ok(ApiResponse.ok("Tenant deactivated", null));
+    }
+
+    @PostMapping("/{id}/archive")
+    public ResponseEntity<ApiResponse<Void>> archive(@PathVariable Long id) {
+        tenantAdminService.archiveTenant(id);
+        return ResponseEntity.ok(ApiResponse.ok("Tenant archived", null));
     }
 
     @GetMapping("/{id}/usage/export")

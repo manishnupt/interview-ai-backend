@@ -117,6 +117,27 @@ The existing /api/auth/register stays functional for now
 (self-serve signup) — Sprint 23 will decide whether to keep 
 both paths or deprecate self-serve.
 
+## Tenant status enum (Sprint 23a)
+companies.is_active (boolean) is being replaced by a proper 
+companies.status enum: ACTIVE | DEACTIVATED | ARCHIVED.
+
+Migration strategy:
+1. Add new status column, backfill from is_active 
+   (true → ACTIVE, false → DEACTIVATED)
+2. Keep is_active column temporarily for backward compatibility 
+   with any code not yet updated
+3. Once all code paths use status, is_active can be dropped 
+   in a future migration (not this sprint)
+
+ARCHIVED is a terminal-ish state — admin can still reactivate 
+from archived back to ACTIVE, but it signals "not coming back" 
+intent vs DEACTIVATED's "temporarily paused" intent. No data 
+is ever deleted as part of archiving — purely a status flag.
+
+New endpoint: GET /api/admin/dashboard returns platform-wide 
+aggregates (no companyId filter) — reuses the same aggregation 
+patterns as TenantAdminService but rolled up across all tenants.
+
 ## Seed credentials (local dev only)
 admin@aiinterview.com / password   (SUPER_ADMIN)
 hr@acmetech.com / password          (COMPANY_ADMIN)
